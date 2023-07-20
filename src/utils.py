@@ -19,9 +19,15 @@ def __logvar_loss(output:BVROutput):
 def __adv_loss(output:BVROutput, discriminator):
     fake = torch.randn_like(output.latent)
 
-    loss = F.binary_cross_entropy(discriminator(output.latent), torch.zeros([len(output.latent), 1]))
-    d_loss = F.binary_cross_entropy(discriminator(output.latent.detach()), torch.ones([len(output.latent), 1]))
-    d_loss = d_loss + F.binary_cross_entropy(discriminator(fake), torch.zeros([len(fake), 1]))
+    zeros = torch.empty(len(output.latent), 2)
+    zeros[:, 0] = 1
+    zeros[:, 1] = 0
+    zeros = zeros.to(output.latent.device)
+    ones = 1 - zeros
+
+    loss = F.binary_cross_entropy_with_logits(discriminator(output.latent), zeros)
+    d_loss = F.binary_cross_entropy_with_logits(discriminator(output.latent.detach()), ones)
+    d_loss = d_loss + F.binary_cross_entropy_with_logits(discriminator(fake), zeros)
 
     return loss, d_loss
 

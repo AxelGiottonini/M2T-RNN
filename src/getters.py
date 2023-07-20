@@ -46,14 +46,14 @@ def get_model(args, return_optimizer=False):
     d_optimizer = None
     if args["mode"] in ADVERSARIAL_MODES:
         discriminator = nn.Sequential(
-            nn.Linear(args["latent_size"], args["discriminator_size"]), 
+            nn.Linear(model.config.vae_latent_size, args["discriminator_size"]), 
             nn.ReLU(),
             nn.Linear(args["discriminator_size"], 2), 
         )
 
         if return_optimizer:
             d_optimizer = torch.optim.AdamW(
-                model.parameters(),
+                discriminator.parameters(),
                 lr=args["d_learning_rate"], 
                 betas=args["d_betas"], 
                 eps=args["d_eps"], 
