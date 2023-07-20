@@ -62,7 +62,7 @@ def train_loop(
     discriminator=None,
     d_optimizer=None,
     device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
-    precision=torch.bfloat16,
+    precision=torch.float32,
     save_model=True,
     save_optimizer=True
 ):
