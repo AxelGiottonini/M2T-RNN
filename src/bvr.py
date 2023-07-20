@@ -202,6 +202,7 @@ class BVR(nn.Module):
         config = BVRConfig.from_config(path, config_name)
         model = cls(config)
         model.load_state_dict(torch.load(os.path.join(path, weights_name)))
+        return model
 
     def save(self, path, weights_name="bvr_weights.bin", config_name="bvr_config.json"):
         self.config.save(path, config_name)
