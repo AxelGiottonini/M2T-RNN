@@ -1,0 +1,10 @@
+*.csv
+*.database
+*.out
+*.log
+*.json
+*.bin
+dev.ipynb
+__pycache__/
+models/
+logs/
