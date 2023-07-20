@@ -45,7 +45,7 @@ def __get_collate_fn__(tokenizer, mask, mask_rate, frag_coef_a=0, frag_coef_b=1,
         input_ids, attention_mask = tokens.input_ids, tokens.attention_mask
 
         if mask:
-            masked_mask = F.dropout(attention_mask.to(torch.float32), (1-mask_rate))
+            masked_mask = torch.empty_like(attention_mask).bernoulli_(mask_rate)
             masked_input_ids = ((1-masked_mask)*input_ids + masked_mask*tokenizer.mask_token_id).to(torch.long)
 
             tokens = MaskedTokens(
