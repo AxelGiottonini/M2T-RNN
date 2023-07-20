@@ -11,15 +11,27 @@ class Tokens():
     attention_mask: typing.Optional[torch.Tensor]=torch.empty([0])
     
     def to(self, *args, **kwargs):
-        for a in dir(self):
-            if not a.startswith('__') and not callable(getattr(self, a)):
-                setattr(self, a, getattr(self, a).to(*args, **kwargs))
+        self.input_ids = self.input_ids.to(*args, **kwargs)
+        self.attention_mask = self.attention_mask.to(*args, **kwargs)
         return self
+
+    #TODO: Fix "RuntimeError: CUDA error: device-side assert triggered"
+    #def to(self, *args, **kwargs):
+    #    for a in dir(self):
+    #        if not a.startswith('__') and not callable(getattr(self, a)):
+    #            setattr(self, a, getattr(self, a).to(*args, **kwargs))
+    #    return self
 
 @dataclass 
 class MaskedTokens(Tokens):
     masked_input_ids: typing.Optional[torch.Tensor]=torch.empty([0])
     masked_mask: typing.Optional[torch.Tensor]=torch.empty([0])
+
+    def to(self, *args, **kwargs):
+        super().to(*args, **kwargs)
+        self.masked_input_ids = self.masked_input_ids.to(*args, **kwargs)
+        self.masked_mask = self.masked_mask.to(*args, **kwargs)
+        return self
 
 def __get_collate_fn__(tokenizer, mask, mask_rate, frag_coef_a=0, frag_coef_b=1, split=True):
     def collate_fn(seqs):
