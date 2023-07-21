@@ -7,6 +7,7 @@ from copy import deepcopy
 
 from dataclasses import dataclass
 import typing
+import warnings
 
 import json
 
@@ -176,17 +177,27 @@ class BVR(nn.Module):
             loss = loss if target is not None else None
         )
     
-    def generate(self, latent, max_len):
+    def generate(self, latent, max_len, mode="sample", num_beams=0):
+        warnings.warn("BVR.generate() usage has not been tested", DeprecationWarning)
         sents = []
         input = torch.zeros(1, len(latent), dtype=torch.long, device=latent.device).fill_(self.config.bert_cls_token_id)
         hidden = None
         for l in range(max_len):
             sents.append(input)
             decoder_output = self.decode(input, latent, hidden)
-            input = torch.multinomial(
-                decoder_output.logits.squeeze(dim=0).exp(),
-                num_samples=1
-            ).t()
+
+            new_token_logits = decoder_output.logits[-1,:,:]
+
+            if mode == "sample":
+                new_token = torch.multinomial(
+                    new_token_logits.squeeze(dim=0).exp(),
+                    num_samples=1
+                ).t()
+            elif mode == "greedy":
+                new_token = new_token_logits.argmax(dim=-1)[None,:]
+            else:
+                raise NotImplementedError()
+            input = torch.cat([input, new_token])
             hidden = decoder_output.hidden
         return torch.cat(sents)
 
