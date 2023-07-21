@@ -1,7 +1,7 @@
 import random
 import torch
 
-from src import configure, train_loop, get_model, get_dataloaders, loss_fn, ADVERSARIAL_MODES
+from src import configure, train_loop, get_model, get_dataloaders, ADVERSARIAL_MODES
 
 random.seed(42)
 torch.manual_seed(42)

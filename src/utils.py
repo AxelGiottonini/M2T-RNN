@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 
 from .bvr import BVROutput
+from .cli import summary
 
 ADVERSARIAL_MODES = ["aae"]
 
@@ -101,6 +102,7 @@ def train_loop(
 
     def decorator(step):
         def wrapper(training_dataloader, validation_dataloader=None):
+            summary(model, training_dataloader, validation_dataloader)
             for i_epoch in range(1, n_epochs+1):
                 epoch_metrics = {
                     "start_time": time.time(),
