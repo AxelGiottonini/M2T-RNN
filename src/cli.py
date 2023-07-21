@@ -67,6 +67,9 @@ def __parse_args__():
         raise ValueError()
     args["d_betas"] = tuple(float(el) for el in betas)
 
+    if args["global_batch_size"] < args["local_batch_size"]:
+        args["local_batch_size"] = args["global_batch_size"]
+
     if not args["global_batch_size"] % args["local_batch_size"] == 0:
         raise ValueError(f"--global_batch_size ({args['global_batch_size']}) should be a multiple of --local_batch_size ({args['local_batch_size']})")
 
