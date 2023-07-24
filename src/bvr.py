@@ -18,6 +18,8 @@ import torch.nn.functional as F
 from transformers.models.bert.modeling_bert import BertEmbeddings
 from transformers import BertConfig, BertForMaskedLM, BertTokenizer
 
+from .outputs import BVREncoderOutput, BVRDecoderOutput, BVROutput
+
 BERT_CONFIG_FIELDS = [
     "vocab_size",
     "type_vocab_size"
@@ -58,12 +60,12 @@ class BVRConfig:
     @property
     def bert(self):
         return type('', (object,), {k[5:]: v for k, v in self.__dict__.items() if k[:4]=="bert"})()
-    
+
     @classmethod
     def from_config(cls, path, file_name="bvr_config.json"):
         if not os.path.isfile(os.path.join(path, file_name)):
             raise FileNotFoundError(f"Coudln't find {file_name} file in the specified directory: {path}")
-        
+
         with open(os.path.join(path, file_name)) as f:
             config = json.load(f)
 
@@ -75,31 +77,10 @@ class BVRConfig:
         bert_config = {"bert_" + k: v for k, v in bert_config.items() if k in BERT_CONFIG_FIELDS}
 
         return BVRConfig(hidden_size, num_layers, dropout, latent_size, bert_cls_token_id=cls_token_id, **bert_config)
-    
+
     def save(self, path, file_name="bvr_config.json"):
         with open(os.path.join(path, file_name), 'w', encoding='utf8') as f:
             f.write(json.dumps(self.__dict__, indent=4, skipkeys=True, sort_keys=False, separators=(',', ': '), ensure_ascii=False))
-
-@dataclass
-class BVREncoderOutput:
-    hidden: torch.Tensor
-    mu: torch.Tensor
-    logvar: torch.Tensor
-
-@dataclass
-class BVRDecoderOutput:
-    hidden: torch.Tensor
-    logits: torch.Tensor
-
-@dataclass
-class BVROutput:
-    encoder_hidden: torch.Tensor
-    mu: torch.Tensor
-    logvar: torch.Tensor
-    decoder_hidden: torch.Tensor
-    logits: torch.Tensor
-    latent: torch.Tensor
-    loss: typing.Optional[torch.Tensor]
 
 class BVR(nn.Module):
     def __init__(self, config):
@@ -138,7 +119,7 @@ class BVR(nn.Module):
             mu = self.hidden2mu(hidden),
             logvar = self.hidden2logvar(hidden)
         )
-    
+
     def decode(self, input, latent, hidden=None):
         input = self.embeddings(input) + self.latent2embeddings(latent)
         output, hidden = self.decoder(input, hidden)
@@ -168,15 +149,13 @@ class BVR(nn.Module):
             ).view(target.size()).mean()
 
         return BVROutput(
-            encoder_hidden=encoder_output.hidden,
             mu = encoder_output.mu,
             logvar = encoder_output.logvar,
-            decoder_hidden = decoder_output.hidden,
             logits = decoder_output.logits,
             latent = latent,
             loss = loss if target is not None else None
         )
-    
+
     def generate(self, latent, max_len, mode="sample", num_beams=0):
         warnings.warn("BVR.generate() usage has not been tested", DeprecationWarning)
         sents = []

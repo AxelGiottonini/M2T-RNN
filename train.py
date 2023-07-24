@@ -22,7 +22,6 @@ if __name__ == "__main__":
         args = args,
         discriminator=discriminator,
         d_optimizer=d_optimizer,
-        #device=torch.device("cpu")
     )
     def train(model, batch):
         out = model(batch.masked_input_ids, batch.input_ids)

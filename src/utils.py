@@ -1,52 +1,13 @@
 import sys
 import os
-from dataclasses import dataclass
 import time
 import logging
 import torch
-import torch.nn.functional as F
 
-from .bvr import BVROutput
 from .cli import summary
+from .loss_fn import loss_fn
 
 ADVERSARIAL_MODES = ["aae"]
-
-def __kl_loss(output:BVROutput):
-    return -0.5 * torch.sum(1 + output.logvar - output.mu.pow(2) - output.logvar.exp()) / len(output.mu)
-
-def __logvar_loss(output:BVROutput):
-    return output.logvar.abs().sum(dim=1).mean()
-
-def __adv_loss(output:BVROutput, discriminator):
-    fake = torch.randn_like(output.latent)
-
-    zeros = torch.empty(len(output.latent), 2)
-    zeros[:, 0] = 1
-    zeros[:, 1] = 0
-    zeros = zeros.to(output.latent.device)
-    ones = 1 - zeros
-
-    loss = F.binary_cross_entropy_with_logits(discriminator(output.latent), zeros)
-    d_loss = F.binary_cross_entropy_with_logits(discriminator(output.latent.detach()), ones)
-    d_loss = d_loss + F.binary_cross_entropy_with_logits(discriminator(fake), zeros)
-
-    return loss, d_loss
-
-def loss_fn(output, discriminator, args):
-    if args["mode"] == "standard":
-        return output.loss
-    
-    if args["mode"] == "vae":
-        return output.loss + args["f_kl"] * __kl_loss(output)
-    
-    if args["mode"] == "aae":
-        adv_loss, d_loss = __adv_loss(output, discriminator)
-        return (
-            output.loss * args["f_logvar"] * __logvar_loss(output) + args["f_adv"] * adv_loss,
-            d_loss
-        )
-    
-    raise NotImplementedError()
 
 def __log_epoch(i_epoch, epoch_metrics, metrics, vdl_is_not_none):
     str_metrics = f"Training Loss: {metrics['training/loss/mean'][-1]:.4f}"
@@ -62,11 +23,11 @@ def train_loop(
     args,
     discriminator=None,
     d_optimizer=None,
-    device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
-    precision=torch.float32,
     save_model=True,
     save_optimizer=True
 ):
+    device = torch.device("cuda:0" if torch.cuda.is_available() and not args["cpu"] else "cpu")
+    precision = args["precision"] = getattr(torch, args["precision"])
     n_epochs = args["n_epochs"]
     global_batch_size = args["global_batch_size"]
     local_batch_size = args["local_batch_size"]
@@ -96,7 +57,7 @@ def train_loop(
 
         if save_optimizer:
             torch.save(
-                optimizer.state_dict(), 
+                optimizer.state_dict(),
                 os.path.join(args["model_dir"], args["model_name"], args["model_version"], dir_name, "optimizer.bin")
             )
 
@@ -124,7 +85,7 @@ def train_loop(
 
                         if (
                             (i_batch + 1) % accumulation_steps == 0 or
-                            (i_batch + 1) == len(training_dataloader) 
+                            (i_batch + 1) == len(training_dataloader)
                         ):
                             if args["mode"] in ADVERSARIAL_MODES:
                                 d_optimizer.step()
@@ -139,13 +100,13 @@ def train_loop(
                             (i_batch + 1) == len(training_dataloader)
                         ):
                             torch.save(
-                                metrics, 
+                                metrics,
                                 os.path.join(args["model_dir"], args["model_name"], args["model_version"], "metrics.bin")
                             )
 
-                    metrics["training/loss/mean"].append(torch.tensor(epoch_metrics["training/loss"]).mean())
+                    metrics["training/loss/mean"].append(torch.Tensor(epoch_metrics["training/loss"]).mean())
 
-                    if validation_dataloader is not None:    
+                    if validation_dataloader is not None:
                         model.eval()
                         torch.cuda.empty_cache()
                         with torch.no_grad():
@@ -155,7 +116,7 @@ def train_loop(
                                 loss, _ = loss if args["mode"] in ADVERSARIAL_MODES else (loss, None)
                                 epoch_metrics["validation/loss"].append(loss.item())
 
-                            metrics["validation/loss/mean"].append(torch.tensor(epoch_metrics["validation/loss"]).mean())
+                            metrics["validation/loss/mean"].append(torch.Tensor(epoch_metrics["validation/loss"]).mean())
 
                     __log_epoch(i_epoch, epoch_metrics, metrics, validation_dataloader is not None)
 

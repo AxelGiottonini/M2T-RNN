@@ -49,12 +49,16 @@ def __parse_args__():
     parser.add_argument("--num_workers", type=int, default=10, help="Number of sub-processes to use for data loading.")
 
     parser.add_argument("--mode", type=str, default="standard")
+    parser.add_argument("--token_wise", action="store_true")
     parser.add_argument("--f_kl", type=float, default=1)
     parser.add_argument("--f_adv", type=float, default=1)
     parser.add_argument("--f_logvar", type=float, default=1)
 
     parser.add_argument("--save_each", type=int, default=10)
-    
+
+    parser.add_argument("--cpu", action="store_true")
+    parser.add_argument("--precision", type=str, default="float32")
+
     args = vars(parser.parse_args())
 
     betas = args["betas"][1:-1].replace(" ", "").split(",")
@@ -79,10 +83,10 @@ def __safe_makedirs__(model_dir, model_name, model_version):
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
 
-    if not os.path.isdir(current:=(os.path.join(model_dir, model_name))):
+    if not os.path.isdir(current:=os.path.join(model_dir, model_name)):
         os.mkdir(current)
 
-    if not os.path.isdir(current:=(os.path.join(model_dir, model_name, model_version))):
+    if not os.path.isdir(current:=os.path.join(model_dir, model_name, model_version)):
         os.mkdir(current)
         os.mkdir(os.path.join(current, "best"))
         os.mkdir(os.path.join(current, "final"))
@@ -94,7 +98,7 @@ def __safe_logging__(log_dir, model_name, model_version):
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
 
-    if not os.path.isdir(current:=(os.path.join(log_dir, model_name))):
+    if not os.path.isdir(current:=os.path.join(log_dir, model_name)):
         os.mkdir(current)
 
     logging.basicConfig(filename=os.path.join(log_dir, model_name, model_version + ".log"), level=logging.INFO, format='%(message)s')
