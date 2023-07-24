@@ -107,7 +107,7 @@ class BVR(nn.Module):
 
         self.hidden2mu = nn.Linear(config.rnn_hidden_size*2, config.vae_latent_size)
         self.hidden2logvar = nn.Linear(config.rnn_hidden_size*2, config.vae_latent_size)
-        self.latent2embeddings = nn.Linear(config.vae_latent_size, config.bert_hidden_size)
+        self.latent2hidden = nn.Linear(config.vae_latent_size, config.rnn_hidden_size)
 
     def encode(self, input):
         input = self.embeddings(input)
@@ -121,7 +121,12 @@ class BVR(nn.Module):
         )
 
     def decode(self, input, latent, hidden=None):
-        input = self.embeddings(input) + self.latent2embeddings(latent)
+        input = self.embeddings(input)
+
+        latent_projection = self.latent2hidden(latent)
+        hidden = torch.zeros_like(latent_projection) if hidden is None else hidden
+        hidden =  latent_projection + hidden
+
         output, hidden = self.decoder(input, hidden)
         logits = self.projection(output.view(-1, output.size(-1)))
 
@@ -137,7 +142,7 @@ class BVR(nn.Module):
 
     def forward(self, input, target=None):
         encoder_output = self.encode(input)
-        latent = self.reparametrize(encoder_output.mu, encoder_output.logvar)
+        latent = torch.stack([self.reparametrize(encoder_output.mu, encoder_output.logvar) for _ in range(self.config.rnn_num_layers)])
         decoder_output = self.decode(input, latent)
 
         if target is not None:
@@ -159,7 +164,7 @@ class BVR(nn.Module):
     def generate(self, latent, max_len, mode="sample", num_beams=0):
         warnings.warn("BVR.generate() usage has not been tested", DeprecationWarning)
         sents = []
-        input = torch.zeros(1, len(latent), dtype=torch.long, device=latent.device).fill_(self.config.bert_cls_token_id)
+        input = torch.zeros(1, latent.shape[1], dtype=torch.long, device=latent.device).fill_(self.config.bert_cls_token_id)
         hidden = None
         for l in range(max_len):
             sents.append(input)

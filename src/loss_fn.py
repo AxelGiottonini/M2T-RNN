@@ -15,18 +15,24 @@ def __logvar_loss(output:VAEOutput):
 def __adv_loss(output:VAEOutput, discriminator, token_wise=False):
     fake = torch.randn_like(output.latent)
 
-    if token_wise:
-        zeros = torch.empty((output.latent.shape[0], output.latent.shape[1], 2))
-        zeros[:, :, 0] = 1
-        zeros[:, :, 1] = 0
-        zeros = zeros.to(output.latent.device)
-        ones = 1 - zeros
-    else:
-        zeros = torch.empty(len(output.latent), 2)
-        zeros[:, 0] = 1
-        zeros[:, 1] = 0
-        zeros = zeros.to(output.latent.device)
-        ones = 1 - zeros
+    zeros = torch.empty((output.latent.shape[0], output.latent.shape[1], 2))
+    zeros[:, :, 0] = 1
+    zeros[:, :, 1] = 0
+    zeros = zeros.to(output.latent.device)
+    ones = 1 - zeros
+
+    #if token_wise:
+    #    zeros = torch.empty((output.latent.shape[0], output.latent.shape[1], 2))
+    #    zeros[:, :, 0] = 1
+    #    zeros[:, :, 1] = 0
+    #    zeros = zeros.to(output.latent.device)
+    #    ones = 1 - zeros
+    #else:
+    #    zeros = torch.empty(len(output.latent), 2)
+    #    zeros[:, 0] = 1
+    #    zeros[:, 1] = 0
+    #    zeros = zeros.to(output.latent.device)
+    #    ones = 1 - zeros
 
     loss = F.binary_cross_entropy_with_logits(discriminator(output.latent), zeros)
     d_loss = F.binary_cross_entropy_with_logits(discriminator(output.latent.detach()), ones)
