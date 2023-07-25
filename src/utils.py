@@ -61,16 +61,30 @@ def train_loop(
                 os.path.join(args["model_dir"], args["model_name"], args["model_version"], dir_name, "optimizer.bin")
             )
 
+    def annealing(i_epoch):
+        if (
+            args["annealing"] is None or \
+            i_epoch <= args["annealing"][0] or
+            i_epoch > args["annealing"][0] + args["annealing"][1]
+        ):
+            return
+        
+        linear = lambda step_i, step_0, n_steps, f_max: (step_i - step_0)/n_steps * f_max
+
+        args["f_kl"] = linear(i_epoch, args["annealing"][0], args["annealing"][1], args["f_kl_max"])
+        args["f_adv"] = linear(i_epoch, args["annealing"][0], args["annealing"][1], args["f_adv_max"])
+        args["f_logvar"] = linear(i_epoch, args["annealing"][0], args["annealing"][1], args["f_logvar_max"])
+
     def decorator(step):
         def wrapper(training_dataloader, validation_dataloader=None):
             summary(model, training_dataloader, validation_dataloader)
             for i_epoch in range(1, n_epochs+1):
+                annealing(i_epoch)
                 epoch_metrics = {
                     "start_time": time.time(),
                     "training/loss": [],
                     "validation/loss": []
                 }
-
                 try:
                     model.train()
                     torch.cuda.empty_cache()

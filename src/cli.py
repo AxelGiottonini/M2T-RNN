@@ -49,10 +49,11 @@ def __parse_args__():
     parser.add_argument("--num_workers", type=int, default=10, help="Number of sub-processes to use for data loading.")
 
     parser.add_argument("--mode", type=str, default="standard")
+    parser.add_argument("--annealing", type=str, default=None, help="(initialize, increase, maintain)")
     parser.add_argument("--token_wise", action="store_true")
-    parser.add_argument("--f_kl", type=float, default=1)
-    parser.add_argument("--f_adv", type=float, default=1)
-    parser.add_argument("--f_logvar", type=float, default=1)
+    parser.add_argument("--f_kl", type=float, default=0)
+    parser.add_argument("--f_adv", type=float, default=0)
+    parser.add_argument("--f_logvar", type=float, default=0)
 
     parser.add_argument("--save_each", type=int, default=10)
 
@@ -76,6 +77,23 @@ def __parse_args__():
 
     if not args["global_batch_size"] % args["local_batch_size"] == 0:
         raise ValueError(f"--global_batch_size ({args['global_batch_size']}) should be a multiple of --local_batch_size ({args['local_batch_size']})")
+
+    if args["annealing"] is not None:
+        annealing = args["annealing"][1:-1].replace(" ", "").split(",")
+        if not len(annealing) == 3:
+            raise ValueError()
+        args["annealing"] = tuple(float(el) for el in annealing)
+
+        args["n_epochs"] = sum(args["annealing"])
+
+        args["f_kl_max"] = args["f_kl"]
+        args["f_adv_max"] = args["f_adv"]
+        args["f_logvar_max"] = args["f_logvar"]
+
+        args["f_kl"] = 0
+        args["f_adv"] = 0
+        args["f_logvar"] = 0
+
 
     return args
 
