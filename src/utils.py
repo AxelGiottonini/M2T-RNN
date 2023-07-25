@@ -126,8 +126,7 @@ def train_loop(
                         with torch.no_grad():
                             for i_batch, batch in enumerate(validation_dataloader):
                                 out = step(model, batch.to(device))
-                                loss = loss_fn(out, discriminator, args)
-                                loss, _ = loss if args["mode"] in ADVERSARIAL_MODES else (loss, None)
+                                loss = loss_fn(out, None, {"mode":"none"})
                                 epoch_metrics["validation/loss"].append(loss.item())
 
                             metrics["validation/loss/mean"].append(torch.Tensor(epoch_metrics["validation/loss"]).mean())
