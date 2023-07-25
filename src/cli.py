@@ -82,7 +82,7 @@ def __parse_args__():
         annealing = args["annealing"][1:-1].replace(" ", "").split(",")
         if not len(annealing) == 3:
             raise ValueError()
-        args["annealing"] = tuple(float(el) for el in annealing)
+        args["annealing"] = tuple(int(el) for el in annealing)
 
         args["n_epochs"] = sum(args["annealing"])
 
