@@ -163,12 +163,12 @@ class BVR(nn.Module):
 
     def generate(self, latent, max_len, mode="sample", num_beams=0):
         warnings.warn("BVR.generate() usage has not been tested", DeprecationWarning)
-        sents = []
         input = torch.zeros(1, latent.shape[1], dtype=torch.long, device=latent.device).fill_(self.config.bert_cls_token_id)
         hidden = None
         for l in range(max_len):
-            sents.append(input)
             decoder_output = self.decode(input, latent, hidden)
+
+            latent = torch.zeros_like(latent)
 
             new_token_logits = decoder_output.logits[-1,:,:]
 
@@ -183,7 +183,7 @@ class BVR(nn.Module):
                 raise NotImplementedError()
             input = torch.cat([input, new_token])
             hidden = decoder_output.hidden
-        return torch.cat(sents)
+        return input
 
     @classmethod
     def from_pretrained_bert(cls, path, hidden_size, num_layers, dropout, latent_size, cls_token_id):

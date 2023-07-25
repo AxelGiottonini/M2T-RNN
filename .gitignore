@@ -5,6 +5,7 @@
 *.json
 *.bin
 dev.ipynb
+metrics.ipynb
 __pycache__/
 models/
 logs/
