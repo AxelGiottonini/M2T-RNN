@@ -69,11 +69,11 @@ def train_loop(
         ):
             return
         
-        linear = lambda step_i, step_0, n_steps, f_max: (step_i - step_0)/n_steps * f_max
+        quadratic = lambda step_i, step_0, n_steps, f_max: ((step_i - step_0)/n_steps * f_max)**2
 
-        args["f_kl"] = linear(i_epoch, args["annealing"][0], args["annealing"][1], args["f_kl_max"])
-        args["f_adv"] = linear(i_epoch, args["annealing"][0], args["annealing"][1], args["f_adv_max"])
-        args["f_logvar"] = linear(i_epoch, args["annealing"][0], args["annealing"][1], args["f_logvar_max"])
+        args["f_kl"] = quadratic(i_epoch, args["annealing"][0], args["annealing"][1], args["f_kl_max"])
+        args["f_adv"] = quadratic(i_epoch, args["annealing"][0], args["annealing"][1], args["f_adv_max"])
+        args["f_logvar"] = quadratic(i_epoch, args["annealing"][0], args["annealing"][1], args["f_logvar_max"])
 
     def decorator(step):
         def wrapper(training_dataloader, validation_dataloader=None):
