@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from transformers.models.bert.modeling_bert import BertEmbeddings
 from transformers import BertConfig, BertForMaskedLM, BertTokenizer
 
+from .highway_network import HighwayCell
 from .outputs import BVREncoderOutput, BVRDecoderOutput, BVROutput
 
 BERT_CONFIG_FIELDS = [
@@ -105,14 +106,16 @@ class BVR(nn.Module):
         )
         self.projection = nn.Linear(config.rnn_hidden_size, config.bert_vocab_size)
 
-        self.hidden2mu = nn.Linear(config.rnn_hidden_size*2, config.vae_latent_size)
-        self.hidden2logvar = nn.Linear(config.rnn_hidden_size*2, config.vae_latent_size)
-        self.latent2hidden = nn.Linear(config.vae_latent_size, config.rnn_hidden_size)
+        self._hidden2mu = nn.ModuleList([nn.Linear(config.rnn_hidden_size*2, config.vae_latent_size) for _ in range(config.rnn_num_layers)])
+        self._hidden2logvar = nn.ModuleList([nn.Linear(config.rnn_hidden_size*2, config.vae_latent_size) for _ in range(config.rnn_num_layers)])
+        self._highway = nn.ModuleList([HighwayCell(config.vae_latent_size) for _ in range(config.rnn_num_layers)])
+        self._latent2hidden = nn.ModuleList([nn.Linear(config.vae_latent_size, config.rnn_hidden_size) for _ in range(config.rnn_num_layers)])
 
     def encode(self, input):
         input = self.embeddings(input)
         _, hidden = self.encoder(input)
-        hidden = torch.cat([hidden[-2], hidden[-1]], 1)
+
+        hidden = torch.cat((hidden[0::2,:,:], hidden[1::2,:,:]), -1)
 
         return BVREncoderOutput(
             hidden = hidden,
@@ -120,12 +123,17 @@ class BVR(nn.Module):
             logvar = self.hidden2logvar(hidden)
         )
 
-    def decode(self, input, latent, hidden=None):
-        input = self.embeddings(input)
+    def hidden2mu(self, hidden):
+        return torch.stack([self._hidden2mu[i](hidden[i,:,:]) for i in range(self.config.rnn_num_layers)])
 
-        latent_projection = self.latent2hidden(latent)
-        hidden = torch.zeros_like(latent_projection) if hidden is None else hidden
-        hidden =  latent_projection + hidden
+    def hidden2logvar(self, hidden):
+        return torch.stack([self._hidden2logvar[i](hidden[i,:,:]) for i in range(self.config.rnn_num_layers)])
+
+    def latent2hidden(self, latent):
+        return torch.stack([self._latent2hidden[i](self._highway[i](latent[i,:,:])) for i in range(self.config.rnn_num_layers)])
+
+    def decode(self, input, hidden):
+        input = self.embeddings(input)
 
         output, hidden = self.decoder(input, hidden)
         logits = self.projection(output.view(-1, output.size(-1)))
@@ -142,8 +150,9 @@ class BVR(nn.Module):
 
     def forward(self, input, target=None):
         encoder_output = self.encode(input)
-        latent = torch.stack([self.reparametrize(encoder_output.mu, encoder_output.logvar) for _ in range(self.config.rnn_num_layers)])
-        decoder_output = self.decode(input, latent)
+        latent = self.reparametrize(encoder_output.mu, encoder_output.logvar)
+
+        decoder_output = self.decode(input, self.latent2hidden(latent))
 
         if target is not None:
             loss = F.cross_entropy(
@@ -161,15 +170,11 @@ class BVR(nn.Module):
             loss = loss if target is not None else None
         )
 
-    def generate(self, latent, max_len, mode="sample", num_beams=0):
-        warnings.warn("BVR.generate() usage has not been tested", DeprecationWarning)
+    def generate(self, latent, max_len, mode="sample"):
         input = torch.zeros(1, latent.shape[1], dtype=torch.long, device=latent.device).fill_(self.config.bert_cls_token_id)
-        hidden = None
-        for l in range(max_len):
-            decoder_output = self.decode(input, latent, hidden)
+        decoder_output = self.decode(input, self.latent2hidden(latent))
 
-            latent = torch.zeros_like(latent)
-
+        for l in range(1, max_len):
             new_token_logits = decoder_output.logits[-1,:,:]
 
             if mode == "sample":
@@ -181,8 +186,9 @@ class BVR(nn.Module):
                 new_token = new_token_logits.argmax(dim=-1)[None,:]
             else:
                 raise NotImplementedError()
+            
             input = torch.cat([input, new_token])
-            hidden = decoder_output.hidden
+            decoder_output = self.decode(input, decoder_output.hidden)
         return input
 
     @classmethod
@@ -196,7 +202,10 @@ class BVR(nn.Module):
     def from_pretrained(cls, path, weights_name="bvr_weights.bin", config_name="bvr_config.json"):
         config = BVRConfig.from_config(path, config_name)
         model = cls(config)
-        model.load_state_dict(torch.load(os.path.join(path, weights_name)))
+        weights = torch.load(os.path.join(path, weights_name))
+        if "embeddings.position_ids" in weights.keys():
+            del weights["embeddings.position_ids"]
+        model.load_state_dict(weights)
         return model
 
     def save(self, path, weights_name="bvr_weights.bin", config_name="bvr_config.json"):
